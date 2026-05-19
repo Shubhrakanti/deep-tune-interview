@@ -149,9 +149,6 @@ def load_task(tasks_file: Path, task_id: str) -> dict:
 
 
 def build_prompt(task: dict, base_url: str) -> str:
-    # Mirrors the spirit of apps/metabase/src/app.py::get_prompt from gym:
-    # tell the agent where Metabase is, hand it creds, and pin the output
-    # format so the JSON grader has something to match on.
     expected_schema = task["answer"]
     return f"""You are an analyst using Metabase to answer a data question.
 
