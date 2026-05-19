@@ -1,0 +1,43 @@
+# Dockerfile.agent — scaling hook for Milestone 3
+#
+# What this is: a buildable image that wraps the existing runner CLI verbatim
+# so it can be `docker run`'d, `modal.spawn`'d, or shipped to any container-
+# scheduling system. The M2 worker does NOT use this image — it shells out to
+# `python -m runner.run_task` on the host (SubprocessLauncher in
+# backend/worker.py). This file exists to prove the agent's CLI contract holds
+# inside a container, so M3 can swap the launcher with zero changes to
+# runner/, grading/, or the FastAPI/SQLite layer.
+#
+# Build:    docker build -f Dockerfile.agent -t agent:latest .
+# Smoke:    docker run --rm agent:latest --help
+#
+# Running a full task inside the container additionally requires the runner to
+# reach a Metabase instance. That's an M3 concern — two ways to do it:
+#   1. Mount /var/run/docker.sock so the runner's `docker compose up -d` calls
+#      spawn sibling containers on the host (sandbox-of-sandboxes pattern).
+#   2. Strip compose lifecycle from the runner; pass --base-url for a Metabase
+#      that's already running (e.g. another Modal sandbox).
+# Today we ship neither, because M2 doesn't need it.
+
+# Pinned to the playwright version in requirements.txt; the base image includes
+# Chromium + system deps so we don't need `playwright install` at runtime.
+FROM mcr.microsoft.com/playwright/python:v1.55.0-jammy
+
+WORKDIR /app
+
+# Install Python deps first so the layer caches across code edits.
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy only what the runner needs (skip backend/, frontend/, runs/, etc.).
+COPY runner/ ./runner/
+COPY grading/ ./grading/
+COPY vendor/ ./vendor/
+COPY tasks.json ./tasks.json
+
+ENV PYTHONUNBUFFERED=1 \
+    PLAYWRIGHT_HEADLESS=1
+
+# The agent CLI IS the entrypoint. Args are passed through:
+#   docker run --rm -e GEMINI_API_KEY=... agent:latest --task-id problem1
+ENTRYPOINT ["python", "-m", "runner.run_task"]
