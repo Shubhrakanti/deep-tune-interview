@@ -280,6 +280,35 @@ def run(
                 # which has no stdin attached. Auto-acknowledge in headless
                 # mode; the headed/interactive path still gets the prompt.
                 agent._get_safety_confirmation = lambda safety: "CONTINUE"  # noqa: SLF001
+
+            # Capture the model's per-turn reasoning into trajectory.jsonl so
+            # the UI can show "WHY did the agent click here?" alongside each
+            # action. The vendored agent puts reasoning in candidate.text and
+            # then immediately fires function_calls; we hook get_model_response
+            # to intercept the candidate, emit one `model_message` event per
+            # iteration that produces actions, and pass the response through
+            # untouched. Iterations with no function_calls are the agent's
+            # final turn — we skip those since `final_answer` already covers
+            # the same text.
+            _original_get_response = agent.get_model_response
+
+            def _hooked_get_response(*args, **kwargs):
+                response = _original_get_response(*args, **kwargs)
+                try:
+                    if response and getattr(response, "candidates", None):
+                        candidate = response.candidates[0]
+                        function_calls = agent.extract_function_calls(candidate)
+                        if function_calls:
+                            text = agent.get_text(candidate) or ""
+                            if text.strip():
+                                env.append_event(
+                                    "model_message", {"text": text}
+                                )
+                except Exception as e:
+                    print(f"[recording] failed to emit model_message: {e}")
+                return response
+
+            agent.get_model_response = _hooked_get_response  # type: ignore[method-assign]
             agent.agent_loop()
 
         final_text = agent.final_reasoning or ""

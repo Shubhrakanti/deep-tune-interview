@@ -32,6 +32,23 @@ function formatArgs(args: Record<string, unknown>): string {
   return parts.join(", ");
 }
 
+function pathOnly(url: string): string {
+  // Strip the http://localhost:PORT prefix so we just show the path. Falls
+  // back to the original string for any non-URL-shaped input.
+  try {
+    const u = new URL(url);
+    return u.pathname + u.search + u.hash || "/";
+  } catch {
+    return url;
+  }
+}
+
+function shortTitle(title: string): string {
+  // Metabase appends " · Metabase" to every page title — strip it so the
+  // useful prefix isn't competing for space with the brand suffix.
+  return title.replace(/\s*·\s*Metabase\s*$/i, "").trim();
+}
+
 export function TranscriptViewer({
   attemptId,
   events,
@@ -100,6 +117,21 @@ function EventRow({
         </li>
       );
     }
+    case "model_message": {
+      const data = event.data as { text?: string };
+      const text = (data.text ?? "").trim();
+      if (!text) return null;
+      return (
+        <li className="rounded-md border border-sky-200/70 dark:border-sky-900/50 bg-sky-50/70 dark:bg-sky-950/30 p-3">
+          <div className="text-[10px] uppercase tracking-wider text-sky-700 dark:text-sky-300 mb-1 font-semibold">
+            {ts} · model reasoning
+          </div>
+          <p className="text-sm whitespace-pre-wrap text-sky-950 dark:text-sky-100 leading-snug">
+            {text}
+          </p>
+        </li>
+      );
+    }
     case "action": {
       const data = event.data as { name: string; args: Record<string, unknown> };
       return (
@@ -116,8 +148,11 @@ function EventRow({
       const data = event.data as {
         screenshot: string;
         url: string;
+        title?: string;
         step: number;
       };
+      const label = data.title ? shortTitle(data.title) : "";
+      const path = pathOnly(data.url);
       return (
         <li className="flex items-start gap-3 px-3 py-2 rounded-md bg-white dark:bg-neutral-900 border border-neutral-200 dark:border-neutral-800">
           <span className="text-neutral-400 text-xs font-mono mt-1 shrink-0">
@@ -135,10 +170,21 @@ function EventRow({
               loading="lazy"
             />
           </button>
-          <div className="text-xs text-neutral-500 mono break-all">
-            step {data.step}
-            <br />
-            <span className="text-neutral-400">{data.url}</span>
+          <div className="min-w-0 flex-1">
+            <div className="text-xs text-neutral-400 mono mb-0.5">
+              step {data.step}
+            </div>
+            {label ? (
+              <div className="text-sm font-medium text-neutral-800 dark:text-neutral-200 truncate">
+                {label}
+              </div>
+            ) : null}
+            <div
+              className="text-xs text-neutral-500 mono truncate"
+              title={data.url}
+            >
+              {path}
+            </div>
           </div>
         </li>
       );

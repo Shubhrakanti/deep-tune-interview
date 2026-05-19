@@ -104,9 +104,22 @@ class RecordingComputer(PlaywrightComputer):
             self._step += 1
             shot_rel = f"screenshots/step_{self._step:04d}.png"
             (self._run_dir / shot_rel).write_bytes(state.screenshot)
+            # Page title is much more readable than the raw URL for the UI
+            # ("Sign in · Metabase" vs ".../auth/login?redirect=%2F"). Best
+            # effort — never let a title read failure break the recording.
+            title = ""
+            try:
+                title = self._page.title() or ""
+            except Exception:
+                pass
             self.append_event(
                 "observation",
-                {"screenshot": shot_rel, "url": state.url, "step": self._step},
+                {
+                    "screenshot": shot_rel,
+                    "url": state.url,
+                    "title": title,
+                    "step": self._step,
+                },
             )
         except Exception as e:
             print(f"[recording] failed to record observation: {e}")

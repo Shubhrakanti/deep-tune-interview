@@ -86,6 +86,12 @@ export type TrajectoryEvent =
   | {
       ts: string;
       seq: number;
+      kind: "model_message";
+      data: { text: string };
+    }
+  | {
+      ts: string;
+      seq: number;
       kind: "action";
       data: { name: string; args: Record<string, unknown> };
     }
@@ -93,7 +99,10 @@ export type TrajectoryEvent =
       ts: string;
       seq: number;
       kind: "observation";
-      data: { screenshot: string; url: string; step: number };
+      // `title` was added in the runner alongside `url` so the UI can show
+      // a readable page label (e.g. "Sign in · Metabase") instead of raw
+      // URLs. Older runs may not have it — render gracefully when missing.
+      data: { screenshot: string; url: string; title?: string; step: number };
     }
   | {
       ts: string;
