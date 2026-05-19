@@ -1,0 +1,10 @@
+# Mirror of vendor/computer-use-preview/requirements.txt so the upstream
+# Gemini Computer Use harness runs in identical conditions to upstream.
+# After `pip install -r requirements.txt`, also run `playwright install chrome`.
+termcolor==3.1.0
+pydantic==2.12.0
+google-genai>=1.40.0
+playwright==1.55.0
+browserbase==1.4.0
+rich
+pytest
