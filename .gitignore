@@ -4,7 +4,17 @@ __pycache__/
 .venv/
 .env
 
+# M1 + M2 artifacts
 runs/
 *.webm
+jobs.db
+jobs.db-wal
+jobs.db-shm
+
+# M2 frontend
+frontend/.next/
+frontend/node_modules/
+frontend/out/
+frontend/.turbo/
 
 .DS_Store

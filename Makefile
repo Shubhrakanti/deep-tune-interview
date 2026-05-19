@@ -1,10 +1,16 @@
-.PHONY: help pull run clean-runs up down reset logs status
+.PHONY: help pull run clean-runs clean-jobs up down reset logs status api web web-install web-build
 
 help:
-	@echo "Per-task runs (recommended):"
+	@echo "M1 — single-task runs (debugging):"
 	@echo "  make pull                - pre-pull postgres + metabase images (first time only)"
 	@echo "  make run TASK=problem1   - boot fresh env -> run agent -> grade -> teardown"
 	@echo "  make clean-runs          - tear down any stranded dt-m1-* compose projects"
+	@echo
+	@echo "M2 — jobs/rollouts platform (two terminals):"
+	@echo "  make api                 - FastAPI backend + asyncio worker on :8000"
+	@echo "  make web                 - Next.js dashboard on :3001"
+	@echo "  make web-install         - pnpm install (first time)"
+	@echo "  make clean-jobs          - rm jobs.db + runs/ (start fresh)"
 	@echo
 	@echo "Manual exploration (long-lived stack on port 3000):"
 	@echo "  make up                  - start Postgres + Metabase, seed the dump"
@@ -32,6 +38,26 @@ clean-runs:
 	      echo "down: $$p"; \
 	      docker compose -p $$p down -v; \
 	    done
+
+# --- M2 platform ----------------------------------------------------------
+
+api:
+	uvicorn backend.main:app --reload --port 8000
+
+web:
+	cd frontend && pnpm dev
+
+web-install:
+	cd frontend && pnpm install
+
+web-build:
+	cd frontend && pnpm build
+
+# Nuke the job DB + all artifact dirs. Does NOT touch stranded docker projects;
+# use `make clean-runs` for those.
+clean-jobs:
+	@rm -rf runs/ jobs.db jobs.db-wal jobs.db-shm
+	@echo "jobs.db + runs/ removed"
 
 # --- manual exploration targets (port 3000) -------------------------------
 
