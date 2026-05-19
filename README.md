@@ -140,15 +140,25 @@ they don't conflict; per-task runs use random ports.
 ```
 deeptune-interview/
 ├── docker-compose.yml          # parametrized port; seed step is inline (pg_restore)
+├── Dockerfile.agent            # M3 stub image for DockerLauncher
 ├── tasks.json                  # M1 tasks + expected answers
 ├── metabase_envdata.sql        # pg_dump -Fc of root_db (Metabase metadata)
+├── Instructions.md             # original take-home brief
 ├── vendor/
 │   └── computer-use-preview/   # git submodule, used verbatim
 ├── runner/
-│   └── run_task.py             # env up -> agent -> grade -> env down
+│   ├── run_task.py             # env up -> agent -> grade -> env down
+│   └── recording_computer.py   # PlaywrightComputer wrapper: video + screenshots + trajectory.jsonl
 ├── grading/
 │   ├── base.py                 # Grader protocol (slot for DB-diff later)
 │   └── json_match.py           # normalized JSON-match grader
+├── backend/                    # M2 FastAPI app + asyncio worker
+│   ├── main.py                 # ASGI entrypoint + lifespan-owned worker task
+│   ├── routes.py               # /api/jobs + /api/attempts/* HTTP routes
+│   ├── worker.py               # poll SQLite -> SubprocessLauncher -> grade
+│   ├── db.py                   # SQLite (WAL) access layer
+│   └── models.py               # pydantic schemas shared by routes + worker
+├── frontend/                   # M2 Next.js dashboard (app router, port 3001)
 ├── Makefile
 └── requirements.txt
 ```
@@ -233,7 +243,9 @@ Two terminals:
 
 ```bash
 # terminal 1
-make api            # uvicorn backend.main:app --reload --port 8000
+make api            # uvicorn backend.main:app --port 8000
+                    # (use `make api-dev` for --reload while iterating on backend code;
+                    #  --reload is off by default because watchfiles is flaky on Python 3.14)
 
 # terminal 2
 make web            # cd frontend && pnpm dev  (Next.js on :3001)
