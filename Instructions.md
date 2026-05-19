@@ -19,9 +19,6 @@ Materials you will need:
     - Note: this is not data for a Metabase “database connection”. It is environment data for the Metabase app itself.
 - Login info: `daksh@deeptune.com`, `Daksh@123`
 
-Gemini API key: `AIzaSyAUiVEYTqBS-3af8KvN7b8hCBYU-an4WvQ`
-
-- If you get rate limited: `AIzaSyDPb_X95Sl5BfvmDCrCUCtKzjRDY4xzGx8`
 
 <aside>
 🔑
