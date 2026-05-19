@@ -25,6 +25,10 @@ services:
       timeout: 5s
       retries: 30
 
+  # One-shot: createdb + pg_restore. Runs to completion before metabase boots.
+  # --no-owner / --no-acl ignore the original 'postgres' owner/grants from the
+  # dump (we reconnect as a different role anyway). --exit-on-error fails the
+  # service loudly if the dump can't be replayed.
   seed:
     image: postgres:16
     depends_on:
@@ -36,8 +40,9 @@ services:
       PGPASSWORD: password
     volumes:
       - ./metabase_envdata.sql:/dump.sql:ro
-      - ./seed/restore.sh:/restore.sh:ro
-    entrypoint: ["bash", "/restore.sh"]
+    command: >
+      bash -c "createdb root_db &&
+               pg_restore --dbname=root_db --no-owner --no-acl --exit-on-error /dump.sql"
     restart: "no"
 
   metabase:

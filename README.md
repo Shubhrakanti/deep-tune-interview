@@ -124,8 +124,7 @@ they don't conflict; per-task runs use random ports.
 
 ```
 deeptune-interview/
-├── docker-compose.yml          # parametrized port; runner sets METABASE_HOST_PORT
-├── seed/restore.sh             # pg_restore the dump into root_db
+├── docker-compose.yml          # parametrized port; seed step is inline (pg_restore)
 ├── tasks.json                  # M1 tasks + expected answers
 ├── metabase_envdata.sql        # pg_dump -Fc of root_db (Metabase metadata)
 ├── vendor/
