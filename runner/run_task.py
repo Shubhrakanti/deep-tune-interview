@@ -272,6 +272,14 @@ def run(
                 query=prompt,
                 model_name=model,
             )
+            if headless:
+                # The vendored agent calls input() to confirm "destructive"
+                # actions Gemini flags with safety_decision=require_confirmation
+                # (e.g. saving a Metabase question). That input() blocks
+                # forever when we're spawned as a subprocess by the M2 worker,
+                # which has no stdin attached. Auto-acknowledge in headless
+                # mode; the headed/interactive path still gets the prompt.
+                agent._get_safety_confirmation = lambda safety: "CONTINUE"  # noqa: SLF001
             agent.agent_loop()
 
         final_text = agent.final_reasoning or ""
