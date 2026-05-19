@@ -1,0 +1,3 @@
+[submodule "vendor/computer-use-preview"]
+	path = vendor/computer-use-preview
+	url = https://github.com/google-gemini/computer-use-preview.git

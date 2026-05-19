@@ -1,0 +1,71 @@
+# Per-task ephemeral environment for Milestone 1.
+#
+# runner/run_task.py invokes this compose file with a unique project name per
+# task run (docker compose -p dt-m1-<task_id>-<ts>) and an injected
+# METABASE_HOST_PORT, then tears it all down (containers + volume) in a
+# finally block. Compose's project prefix is what isolates concurrent runs:
+# each gets its own postgres container, its own metabase container, and its
+# own `<project>_pgdata` volume.
+#
+# The default port 3000 keeps `make up` working for manual exploration of
+# Metabase outside of task runs.
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: postgres
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD", "pg_isready", "-U", "postgres"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+
+  # One-shot: createdb + pg_restore. Runs to completion before metabase boots.
+  # --no-owner / --no-acl ignore the original 'postgres' owner/grants from the
+  # dump (we reconnect as a different role anyway). --exit-on-error fails the
+  # service loudly if the dump can't be replayed.
+  seed:
+    image: postgres:16
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGUSER: postgres
+      PGPASSWORD: password
+    volumes:
+      - ./metabase_envdata.sql:/dump.sql:ro
+    command: >
+      bash -c "createdb root_db &&
+               pg_restore --dbname=root_db --no-owner --no-acl --exit-on-error /dump.sql"
+    restart: "no"
+
+  metabase:
+    image: metabase/metabase:v0.55.16
+    depends_on:
+      seed:
+        condition: service_completed_successfully
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_HOST: postgres
+      MB_DB_PORT: 5432
+      MB_DB_USER: postgres
+      MB_DB_PASS: password
+      MB_DB_DBNAME: root_db
+      JAVA_TIMEZONE: UTC
+    ports:
+      - "${METABASE_HOST_PORT:-3000}:3000"
+    healthcheck:
+      test: ["CMD", "curl", "-sSf", "http://localhost:3000/api/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 60s
+
+volumes:
+  pgdata:
