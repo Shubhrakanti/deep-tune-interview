@@ -41,7 +41,14 @@ clean-runs:
 
 # --- M2 platform ----------------------------------------------------------
 
+# Note: no --reload by default. uvicorn's --reload + watchfiles has been
+# flaky on Python 3.14 (the worker subprocess can leave the parent with a
+# bound socket but no live ASGI app). Use `make api-dev` if you want
+# auto-reload while iterating on backend code.
 api:
+	uvicorn backend.main:app --port 8000
+
+api-dev:
 	uvicorn backend.main:app --reload --port 8000
 
 web:

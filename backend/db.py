@@ -17,8 +17,9 @@ from __future__ import annotations
 import datetime as dt
 import sqlite3
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
-from typing import Optional
+from typing import Iterator, Optional
 
 from backend.models import (
     Attempt,
@@ -74,11 +75,22 @@ class Database:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         self._bootstrap()
 
-    def _connect(self) -> sqlite3.Connection:
+    @contextmanager
+    def _connect(self) -> Iterator[sqlite3.Connection]:
+        """Yield a connection that is GUARANTEED to be closed on exit.
+
+        IMPORTANT: do not replace this with a plain `sqlite3.connect()` and
+        `with conn:` — sqlite3.Connection's __exit__ only commits/rolls back
+        the transaction; it does NOT close the connection. Forgetting to close
+        leaks an FD per call and eventually wedges WAL mode.
+        """
         conn = sqlite3.connect(self.db_path, isolation_level=None, timeout=30.0)
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA foreign_keys=ON;")
-        return conn
+        try:
+            yield conn
+        finally:
+            conn.close()
 
     def _bootstrap(self) -> None:
         with self._connect() as conn:

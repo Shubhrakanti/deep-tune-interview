@@ -223,7 +223,13 @@ async def worker_loop(
     stop_event: Optional[asyncio.Event] = None,
 ) -> None:
     """Main worker loop. Cancellable via cancellation of the parent task or
-    via `stop_event.set()`."""
+    via `stop_event.set()`.
+
+    Concurrency model: acquire a semaphore slot BEFORE claiming an attempt.
+    This guarantees `attempts.status='running'` in the DB reflects reality —
+    only attempts actually executing right now (max `max_parallel`) are
+    marked running; the rest stay 'queued' until a slot frees up.
+    """
     launcher = launcher or SubprocessLauncher()
     reconciled = db.reconcile_on_startup()
     if reconciled:
@@ -235,21 +241,30 @@ async def worker_loop(
         flush=True,
     )
 
-    async def _spawn(att: Attempt) -> None:
-        async with sem:
+    async def _run_and_release(att: Attempt) -> None:
+        try:
             await _run_one(db, launcher, att)
+        finally:
+            sem.release()
 
     try:
         while True:
             if stop_event and stop_event.is_set():
                 break
+            # Wait for a slot before touching the DB. This is what enforces
+            # max_parallel as a true cap on concurrent rollouts.
+            await sem.acquire()
+            if stop_event and stop_event.is_set():
+                sem.release()
+                break
             attempt = db.claim_next_queued()
             if attempt is None:
+                # No work; give the slot back and idle briefly so we don't spin.
+                sem.release()
                 await asyncio.sleep(POLL_INTERVAL_S)
-                # Reap completed tasks so we don't leak references.
                 in_flight = {t for t in in_flight if not t.done()}
                 continue
-            task = asyncio.create_task(_spawn(attempt))
+            task = asyncio.create_task(_run_and_release(attempt))
             in_flight.add(task)
             task.add_done_callback(in_flight.discard)
     finally:
